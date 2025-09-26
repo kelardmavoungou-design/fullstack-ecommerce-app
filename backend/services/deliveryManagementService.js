@@ -914,6 +914,194 @@ const createCompleteDelivery = async (deliveryData, adminId) => {
   }
 };
 
+// Récupérer les commandes en attente d'assignation de livraison
+const getOrdersPendingDelivery = async () => {
+  try {
+    const orders = await prisma.order.findMany({
+      where: {
+        status: 'paid',
+        delivery_person_id: null, // Pas encore assigné à un livreur
+        deliveries: {
+          none: {} // Pas de livraison associée
+        }
+      },
+      include: {
+        buyer: {
+          select: {
+            id: true,
+            full_name: true,
+            email: true,
+            phone_number: true
+          }
+        },
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            latitude: true,
+            longitude: true
+          }
+        },
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                price: true,
+                image: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { created_at: 'desc' }
+    });
+
+    return {
+      success: true,
+      orders: orders.map(order => ({
+        id: order.id,
+        buyer: order.buyer,
+        shop: order.shop,
+        items: order.items.map(item => ({
+          product_id: item.product_id,
+          product_name: item.product.name,
+          quantity: item.quantity,
+          price: item.price,
+          total: parseFloat(item.price) * item.quantity
+        })),
+        total: parseFloat(order.total),
+        shipping_address: order.shipping_address,
+        delivery_latitude: order.delivery_latitude,
+        delivery_longitude: order.delivery_longitude,
+        created_at: order.created_at
+      }))
+    };
+
+  } catch (error) {
+    console.error('Erreur lors de la récupération des commandes en attente:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+// Assigner un livreur à une commande existante
+const assignDeliveryToOrder = async (orderId, deliveryPersonId, adminId, notes = null) => {
+  try {
+    // Vérifier que la commande existe et n'a pas déjà de livraison
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        deliveries: true,
+        buyer: true,
+        shop: true,
+        items: {
+          include: { product: true }
+        }
+      }
+    });
+
+    if (!order) {
+      throw new Error('Commande non trouvée');
+    }
+
+    if (order.deliveries.length > 0) {
+      throw new Error('Cette commande a déjà une livraison assignée');
+    }
+
+    if (order.status !== 'paid') {
+      throw new Error('Seules les commandes payées peuvent recevoir une livraison');
+    }
+
+    // Vérifier que le livreur existe et est disponible
+    const deliveryPerson = await prisma.user.findUnique({
+      where: { id: deliveryPersonId }
+    });
+
+    if (!deliveryPerson || deliveryPerson.role_id !== 4) { // 4 = delivery role
+      throw new Error('Livreur non trouvé ou invalide');
+    }
+
+    // Créer la livraison pour cette commande
+    const validationCode = generateValidationCode();
+    const delivery = await prisma.delivery.create({
+      data: {
+        order_id: orderId,
+        delivery_person_id: deliveryPersonId,
+        status: 'assigned',
+        total_products: order.items.length,
+        collected_products: 0,
+        progress: 0,
+        validation_code: validationCode,
+        assigned_at: new Date(),
+        notes: notes
+      },
+      include: {
+        delivery_person: {
+          select: {
+            id: true,
+            full_name: true,
+            email: true,
+            phone_number: true
+          }
+        }
+      }
+    });
+
+    // Créer les entrées de collecte pour chaque produit
+    for (const item of order.items) {
+      const product = await prisma.product.findUnique({
+        where: { id: item.product_id },
+        include: { shop: true }
+      });
+
+      await prisma.deliveryProductCollection.create({
+        data: {
+          delivery_id: delivery.id,
+          product_id: item.product_id,
+          shop_id: product.shop_id,
+          status: 'pending'
+        }
+      });
+    }
+
+    // Mettre à jour la commande avec l'ID du livreur
+    await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        delivery_person_id: deliveryPersonId
+      }
+    });
+
+    console.log(`Livraison assignée #${delivery.id} pour commande #${orderId} par admin ${adminId}`);
+
+    return {
+      success: true,
+      delivery,
+      order: {
+        id: order.id,
+        buyer: order.buyer,
+        shop: order.shop,
+        total: order.total,
+        shipping_address: order.shipping_address
+      },
+      validationCode,
+      message: 'Livraison assignée avec succès'
+    };
+
+  } catch (error) {
+    console.error('Erreur lors de l\'assignation de livraison:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
 module.exports = {
   createOrderWithDelivery,
   collectProduct,
@@ -929,5 +1117,7 @@ module.exports = {
   getAvailableDeliveryPersonnel,
   createManualDelivery,
   createCompleteDelivery,
+  getOrdersPendingDelivery,
+  assignDeliveryToOrder,
   getDeliveryStats
 };

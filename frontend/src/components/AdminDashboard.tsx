@@ -7,6 +7,7 @@ import { useAuth } from "./AuthContext";
 import { toast } from "sonner";
 import useWebSocket from "../hooks/useWebSocket";
 import { CreateDeliveryModal } from "./CreateDeliveryModal";
+import { AssignDeliveryModal } from "./AssignDeliveryModal";
 import {
   Users,
   ShoppingBag,
@@ -199,6 +200,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
   // Modal state
   const [isCreateDeliveryModalOpen, setIsCreateDeliveryModalOpen] = useState(false);
+  const [isAssignDeliveryModalOpen, setIsAssignDeliveryModalOpen] = useState(false);
 
   // ===== ALGORITHME Admin_Dashboard_Complet - ÉTATS =====
   const [platformStats, setPlatformStats] = useState<PlatformStats>({
@@ -3185,11 +3187,11 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                 </div>
                 <div className="flex items-center space-x-4">
                   <Button
-                    onClick={() => setIsCreateDeliveryModalOpen(true)}
+                    onClick={() => setIsAssignDeliveryModalOpen(true)}
                     className="bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     <Plus className="h-4 w-4 mr-2" />
-                    Créer Livraison
+                    Assigner Livraison
                   </Button>
                   <Button variant="outline" className="border-gray-300 text-gray-700 hover:bg-gray-50">
                     <RefreshCw className="h-4 w-4 mr-2" />
@@ -3428,7 +3430,18 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
         </Tabs>
       </main>
 
-      {/* Create Delivery Modal */}
+      {/* Assign Delivery Modal */}
+      <AssignDeliveryModal
+        isOpen={isAssignDeliveryModalOpen}
+        onClose={() => setIsAssignDeliveryModalOpen(false)}
+        onDeliveryAssigned={() => {
+          loadDeliveries();
+          loadDeliveryStats();
+          loadDeliveryPersonnel();
+        }}
+      />
+
+      {/* Create Delivery Modal (legacy) */}
       <CreateDeliveryModal
         isOpen={isCreateDeliveryModalOpen}
         onClose={() => setIsCreateDeliveryModalOpen(false)}

@@ -1149,9 +1149,42 @@ router.post('/admin/deliveries/create', authenticateToken, isSuperAdmin, async (
 
 /**
  * @swagger
- * /api/admin/deliveries/create-complete:
+ * /api/admin/orders/pending-delivery:
+ *   get:
+ *     summary: Get orders pending delivery assignment (SuperAdmin only)
+ *     tags: [Admin Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Orders pending delivery retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Access denied
+ *       500:
+ *         description: Server error
+ */
+router.get('/admin/orders/pending-delivery', authenticateToken, isSuperAdmin, async (req, res) => {
+  try {
+    const result = await getOrdersPendingDelivery();
+
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(500).json({ message: result.error });
+    }
+  } catch (error) {
+    console.error('Error getting orders pending delivery:', error);
+    res.status(500).json({ message: 'Erreur lors de la récupération des commandes en attente de livraison' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/deliveries/assign-to-order:
  *   post:
- *     summary: Create a complete delivery from scratch (SuperAdmin only)
+ *     summary: Assign a delivery person to an existing order (SuperAdmin only)
  *     tags: [Admin Deliveries]
  *     security:
  *       - bearerAuth: []
@@ -1162,45 +1195,12 @@ router.post('/admin/deliveries/create', authenticateToken, isSuperAdmin, async (
  *           schema:
  *             type: object
  *             required:
- *               - buyer_id
- *               - shop_id
- *               - items
- *               - shipping_address
- *               - delivery_latitude
- *               - delivery_longitude
+ *               - order_id
  *               - delivery_person_id
  *             properties:
- *               buyer_id:
+ *               order_id:
  *                 type: integer
- *                 description: ID of the buyer
- *               shop_id:
- *                 type: integer
- *                 description: ID of the shop
- *               items:
- *                 type: array
- *                 items:
- *                   type: object
- *                   required:
- *                     - product_id
- *                     - quantity
- *                   properties:
- *                     product_id:
- *                       type: integer
- *                       description: Product ID
- *                     quantity:
- *                       type: integer
- *                       description: Quantity to deliver
- *               shipping_address:
- *                 type: string
- *                 description: Delivery address
- *               delivery_latitude:
- *                 type: number
- *                 format: decimal
- *                 description: Delivery latitude
- *               delivery_longitude:
- *                 type: number
- *                 format: decimal
- *                 description: Delivery longitude
+ *                 description: ID of the order
  *               delivery_person_id:
  *                 type: integer
  *                 description: ID of the delivery person
@@ -1209,7 +1209,7 @@ router.post('/admin/deliveries/create', authenticateToken, isSuperAdmin, async (
  *                 description: Optional delivery notes
  *     responses:
  *       201:
- *         description: Complete delivery created successfully
+ *         description: Delivery assigned to order successfully
  *       401:
  *         description: Unauthorized
  *       403:
@@ -1219,12 +1219,12 @@ router.post('/admin/deliveries/create', authenticateToken, isSuperAdmin, async (
  *       500:
  *         description: Server error
  */
-router.post('/admin/deliveries/create-complete', authenticateToken, isSuperAdmin, async (req, res) => {
+router.post('/admin/deliveries/assign-to-order', authenticateToken, isSuperAdmin, async (req, res) => {
   try {
-    const deliveryData = req.body;
+    const { order_id, delivery_person_id, notes } = req.body;
     const adminId = req.user.id;
 
-    const result = await createCompleteDelivery(deliveryData, adminId);
+    const result = await assignDeliveryToOrder(order_id, delivery_person_id, adminId, notes);
 
     if (result.success) {
       res.status(201).json(result);
@@ -1232,8 +1232,8 @@ router.post('/admin/deliveries/create-complete', authenticateToken, isSuperAdmin
       res.status(400).json({ message: result.error });
     }
   } catch (error) {
-    console.error('Error creating complete delivery:', error);
-    res.status(500).json({ message: 'Erreur lors de la création de la livraison complète' });
+    console.error('Error assigning delivery to order:', error);
+    res.status(500).json({ message: 'Erreur lors de l\'assignation de la livraison à la commande' });
   }
 });
 
