@@ -1,0 +1,26 @@
+/* Leaflet CSS - Import séparé pour éviter les conflits */
+@import 'leaflet/dist/leaflet.css';
+
+/* Styles personnalisés pour les marqueurs */
+.leaflet-marker-icon.custom-marker {
+  border-radius: 50% !important;
+  border: 2px solid white !important;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.3) !important;
+}
+
+/* Styles pour les popups */
+.leaflet-popup-content-wrapper {
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
+
+.leaflet-popup-content {
+  margin: 8px 12px !important;
+  font-family: inherit !important;
+}
+
+/* Styles pour les contrôles */
+.leaflet-control-container .leaflet-control {
+  border-radius: 4px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+}

@@ -1,0 +1,642 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id    Int        @id @default(autoincrement())
+  name  roles_name @unique(map: "name")
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+    id            Int            @id @default(autoincrement())
+    full_name     String         @db.VarChar(100)
+    email         String         @unique(map: "email") @db.VarChar(100)
+    phone_number  String?        @db.VarChar(20)
+    password_hash String?        @db.VarChar(255)
+    google_id     String?        @unique(map: "google_id") @db.VarChar(100)
+    facebook_id   String?        @unique(map: "facebook_id") @db.VarChar(100)
+    avatar        String?        @db.Text
+    is_verified   Boolean?       @default(false)
+    wallet_balance Decimal        @db.Decimal(10, 2) @default(0)
+    total_sales   Decimal        @db.Decimal(10, 2) @default(0)
+    // Bank account information for withdrawals
+    bank_provider String?        @db.VarChar(50) // 'orange_money', 'mtn_money', 'moov_money', etc.
+    bank_account  String?        @db.VarChar(50) // Phone number or account number
+    bank_verified Boolean?       @default(false)
+    bank_name     String?        @db.VarChar(100) // Account holder name
+    seller_commission_rate Decimal? @db.Decimal(5, 2) @default(10.00) // Commission rate for sellers (percentage)
+    role_id       Int
+    created_at    DateTime?      @default(now()) @db.DateTime(0)
+    reports       AdminReport[]
+    carts         Cart[]
+    notifications Notification[]
+    orders        Order[]
+    otps          Otp[]
+    reviews       Review[]
+    shops         Shop[]
+    adImpressions AdImpression[]
+    adClicks      AdClick[]
+    approvedCampaigns AdCampaign[]
+    role          Role           @relation(fields: [role_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "users_ibfk_1")
+    wishlists     Wishlist[]
+    assignedOrders Order[]       @relation("DeliveryPersonOrders")
+    deliveries    Delivery[]
+    commissions   Commission[]
+    collectedProducts DeliveryProductCollection[]
+    tracking      DeliveryTracking[]
+
+    @@index([role_id], map: "role_id")
+    @@map("users")
+}
+
+model Otp {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  code       String    @db.VarChar(64)
+  type       otps_type
+  is_used    Boolean?  @default(false)
+  created_at DateTime? @default(now()) @db.DateTime(0)
+  expires_at DateTime  @db.DateTime(0)
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "otps_ibfk_1")
+
+  @@index([code], map: "code")
+  @@index([user_id], map: "user_id")
+  @@map("otps")
+}
+
+model Shop {
+   id              Int           @id @default(autoincrement())
+   seller_id       Int
+   name            String        @db.VarChar(100)
+   description     String?       @db.Text
+   logo            String?       @db.Text
+   is_active       Boolean?      @default(true)
+   created_at      DateTime?     @default(now()) @db.DateTime(0)
+   // Footer customization fields
+   address         String?       @db.VarChar(255)
+   phone           String?       @db.VarChar(20)
+   email           String?       @db.VarChar(100)
+   opening_hours   String?       @db.Text
+   facebook_url    String?       @db.VarChar(500)
+   twitter_url     String?       @db.VarChar(500)
+   instagram_url   String?       @db.VarChar(500)
+   youtube_url     String?       @db.VarChar(500)
+   footer_description String?    @db.Text
+   // GPS coordinates for delivery pickup
+   latitude        Decimal?      @db.Decimal(10, 8)
+   longitude       Decimal?      @db.Decimal(11, 8)
+   campaigns       AdCampaign[]
+   orders          Order[]
+   products        Product[]
+   seller          User          @relation(fields: [seller_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "shops_ibfk_1")
+   productCollections DeliveryProductCollection[]
+
+   @@index([seller_id], map: "seller_id")
+   @@map("shops")
+}
+
+model Product {
+   id          Int         @id @default(autoincrement())
+   shop_id     Int
+   name        String      @db.VarChar(100)
+   description String?     @db.Text
+   price       Decimal     @db.Decimal(10, 2)
+   stock       Int         @default(0)
+   category    String?     @db.VarChar(100)
+   variants    Json?
+   image       String?     @db.Text
+   images      String?     @db.Text // JSON string of image URLs array for gallery
+   created_at  DateTime?   @default(now()) @db.DateTime(0)
+   cartItems   CartItem[]
+   orderItems  OrderItem[]
+   shop        Shop        @relation(fields: [shop_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "products_ibfk_1")
+   reviews     Review[]
+   wishlists   Wishlist[]
+   collections DeliveryProductCollection[]
+
+   @@index([category], map: "category")
+   @@index([shop_id], map: "shop_id")
+   @@map("products")
+}
+
+model Cart {
+  id         Int        @id @default(autoincrement())
+  buyer_id   Int
+  created_at DateTime?  @default(now()) @db.DateTime(0)
+  items      CartItem[]
+  buyer      User       @relation(fields: [buyer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "carts_ibfk_1")
+
+  @@index([buyer_id], map: "buyer_id")
+  @@map("carts")
+}
+
+model CartItem {
+  id         Int     @id @default(autoincrement())
+  cart_id    Int
+  product_id Int
+  quantity   Int     @default(1)
+  cart       Cart    @relation(fields: [cart_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "cart_items_ibfk_1")
+  product    Product @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "cart_items_ibfk_2")
+
+  @@index([cart_id], map: "cart_id")
+  @@index([product_id], map: "product_id")
+  @@map("cart_items")
+}
+
+model Order {
+    id               Int                   @id @default(autoincrement())
+    buyer_id         Int
+    shop_id          Int
+    delivery_person_id Int?
+    status           orders_status?        @default(pending)
+    total            Decimal               @db.Decimal(10, 2)
+    payment_method   orders_payment_method
+    shipping_address String?               @db.Text
+    delivery_code    String?               @db.VarChar(10)
+    is_delivered     Boolean?              @default(false)
+    // GPS coordinates for delivery tracking
+    delivery_latitude  Decimal?             @db.Decimal(10, 8)
+    delivery_longitude Decimal?             @db.Decimal(11, 8)
+    created_at       DateTime?             @default(now()) @db.DateTime(0)
+    items            OrderItem[]
+    buyer            User                  @relation(fields: [buyer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "orders_ibfk_1")
+    shop             Shop                  @relation(fields: [shop_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "orders_ibfk_2")
+    delivery_person  User?                 @relation("DeliveryPersonOrders", fields: [delivery_person_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "orders_delivery_person_ibfk")
+    payments         Payment[]
+    deliveries       Delivery[]
+    mtnPayments      MtnPayment[]
+    airtelPayments   AirtelPayment[]
+    refunds          Refund[]
+    deliveryTracking DeliveryTracking[]
+
+    @@index([buyer_id], map: "buyer_id")
+    @@index([shop_id], map: "shop_id")
+    @@index([delivery_person_id], map: "delivery_person_id")
+    @@index([status], map: "status")
+    @@map("orders")
+}
+
+model OrderItem {
+   id         Int     @id @default(autoincrement())
+   order_id   Int
+   product_id Int
+   quantity   Int
+   price      Decimal @db.Decimal(10, 2)
+   order      Order   @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "order_items_ibfk_1")
+   product    Product @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "order_items_ibfk_2")
+
+   @@index([order_id], map: "order_id")
+   @@index([product_id], map: "product_id")
+   @@map("order_items")
+}
+
+model Delivery {
+    id               Int            @id @default(autoincrement())
+    order_id         Int
+    delivery_person_id Int
+    status           deliveries_status @default(assigned)
+    assigned_at      DateTime?      @default(now()) @db.DateTime(0)
+    picked_up_at     DateTime?      @db.DateTime(0)
+    delivered_at     DateTime?      @db.DateTime(0)
+    notes            String?        @db.Text
+    // Advanced delivery tracking fields
+    total_products   Int            @default(0) // Total number of products to collect
+    collected_products Int          @default(0) // Number of products collected so far
+    progress         Decimal        @db.Decimal(5, 2) @default(0) // Progress percentage (0-100)
+    validation_code  String?        @db.VarChar(20) // Unique QR code for delivery validation
+    is_gps_active    Boolean        @default(false) // GPS tracking active
+    order            Order          @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "deliveries_ibfk_1")
+    delivery_person  User           @relation(fields: [delivery_person_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "deliveries_ibfk_2")
+    productCollections DeliveryProductCollection[]
+    tracking         DeliveryTracking[]
+
+    @@index([order_id], map: "order_id")
+    @@index([delivery_person_id], map: "delivery_person_id")
+    @@index([status], map: "status")
+    @@index([validation_code], map: "validation_code")
+    @@map("deliveries")
+}
+
+model DeliveryProductCollection {
+    id               Int      @id @default(autoincrement())
+    delivery_id      Int
+    product_id       Int
+    shop_id          Int
+    collected_at     DateTime? @db.DateTime(0)
+    collected_by     Int?     // Delivery person who collected it
+    status           String   @db.VarChar(20) @default("pending") // pending, collected, failed
+    notes            String?  @db.Text
+    delivery         Delivery @relation(fields: [delivery_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+    product          Product  @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+    shop             Shop     @relation(fields: [shop_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+    collector        User?    @relation(fields: [collected_by], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+    @@index([delivery_id], map: "delivery_id")
+    @@index([product_id], map: "product_id")
+    @@index([shop_id], map: "shop_id")
+    @@index([status], map: "status")
+    @@map("delivery_product_collections")
+}
+
+model DeliveryTracking {
+    id               Int      @id @default(autoincrement())
+    delivery_id      Int?
+    order_id         Int?
+    delivery_person_id Int
+    latitude         Decimal  @db.Decimal(10, 8)
+    longitude        Decimal  @db.Decimal(11, 8)
+    accuracy         Decimal? @db.Decimal(5, 2) // GPS accuracy in meters
+    speed            Decimal? @db.Decimal(5, 2) // Speed in m/s
+    heading          Decimal? @db.Decimal(5, 2) // Direction in degrees
+    timestamp        DateTime @default(now()) @db.DateTime(0)
+    delivery         Delivery? @relation(fields: [delivery_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+    order            Order?   @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+    delivery_person  User     @relation(fields: [delivery_person_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+    @@index([delivery_id], map: "delivery_id")
+    @@index([order_id], map: "order_id")
+    @@index([delivery_person_id], map: "delivery_person_id")
+    @@index([timestamp], map: "timestamp")
+    @@map("delivery_tracking")
+}
+
+model Payment {
+   id             Int      @id @default(autoincrement())
+   order_id       Int
+   amount         Decimal  @db.Decimal(10, 2)
+   payment_method String   @db.VarChar(50)
+   transaction_id String?  @db.VarChar(255)
+   status         String   @db.VarChar(50) @default("pending")
+   created_at     DateTime @default(now()) @db.DateTime(0)
+   order          Order    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "payments_ibfk_1")
+
+   @@index([order_id], map: "order_id")
+   @@map("payments")
+}
+
+model Wishlist {
+  id         Int       @id @default(autoincrement())
+  buyer_id   Int
+  product_id Int
+  created_at DateTime? @default(now()) @db.DateTime(0)
+  buyer      User      @relation(fields: [buyer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "wishlists_ibfk_1")
+  product    Product   @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "wishlists_ibfk_2")
+
+  @@unique([buyer_id, product_id], map: "buyer_id")
+  @@index([product_id], map: "product_id")
+  @@map("wishlists")
+}
+
+model Review {
+  id         Int       @id @default(autoincrement())
+  buyer_id   Int
+  product_id Int
+  rating     Int
+  comment    String?   @db.Text
+  created_at DateTime? @default(now()) @db.DateTime(0)
+  buyer      User      @relation(fields: [buyer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "reviews_ibfk_1")
+  product    Product   @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "reviews_ibfk_2")
+
+  @@unique([buyer_id, product_id], map: "buyer_id")
+  @@index([product_id], map: "product_id")
+  @@map("reviews")
+}
+
+model AdCampaign {
+  id                    Int                      @id @default(autoincrement())
+  shop_id               Int
+  title                 String                   @db.VarChar(200)
+  description           String?                  @db.Text
+  status                ad_campaigns_status?     @default(draft)
+  budget_type           ad_budget_type           @default(total)
+  total_budget          Decimal                  @db.Decimal(10, 2)
+  daily_budget          Decimal?                 @db.Decimal(10, 2)
+  spent_budget          Decimal                  @db.Decimal(10, 2) @default(0)
+  start_date            DateTime                 @db.DateTime(0)
+  end_date              DateTime                 @db.DateTime(0)
+  created_at            DateTime?                @default(now()) @db.DateTime(0)
+  updated_at            DateTime?                @updatedAt @db.DateTime(0)
+  // Manual validation fields
+  submitted_at          DateTime?                @db.DateTime(0)
+  approved_by           Int?
+  approved_at           DateTime?                @db.DateTime(0)
+  rejection_reason      String?                  @db.Text
+  last_status_change    DateTime?                @db.DateTime(0)
+  // Notification tracking
+  notification_sent     Boolean                  @default(false)
+  shop                  Shop                     @relation(fields: [shop_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "ad_campaigns_ibfk_1")
+  ads                   Ad[]
+  impressions           AdImpression[]
+  clicks                AdClick[]
+  approver              User?                    @relation(fields: [approved_by], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "ad_campaigns_approver_ibfk")
+
+  @@index([shop_id], map: "shop_id")
+  @@index([status], map: "status")
+  @@index([start_date, end_date], map: "campaign_dates")
+  @@index([approved_by], map: "approved_by")
+  @@map("ad_campaigns")
+}
+
+model Ad {
+  id                    Int                      @id @default(autoincrement())
+  campaign_id           Int
+  title                 String                   @db.VarChar(200)
+  content               String                   @db.Text
+  image                 String?                  @db.Text
+  target_url            String                   @db.VarChar(500)
+  target_age_min        Int?                     @default(18)
+  target_age_max        Int?                     @default(65)
+  target_regions        String?                  @db.Text // JSON array of regions
+  target_categories     String?                  @db.Text // JSON array of categories
+  placement             ad_placement             @default(home)
+  cost_model            ad_cost_model            @default(cpc)
+  cost_per_click        Decimal?                 @db.Decimal(5, 2) @default(100)
+  cost_per_impression   Decimal?                 @db.Decimal(5, 2) @default(10)
+  status                ads_status?              @default(pending)
+  is_active             Boolean                  @default(false)
+  created_at            DateTime?                @default(now()) @db.DateTime(0)
+  campaign              AdCampaign               @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "ads_ibfk_1")
+  impressions           AdImpression[]
+  clicks                AdClick[]
+
+  @@index([campaign_id], map: "campaign_id")
+  @@index([status], map: "status")
+  @@index([placement], map: "placement")
+  @@index([is_active], map: "is_active")
+  @@map("ads")
+}
+
+model AdImpression {
+  id            Int       @id @default(autoincrement())
+  campaign_id   Int
+  ad_id         Int
+  user_id       Int?
+  ip_address    String    @db.VarChar(45)
+  user_agent    String?   @db.Text
+  placement     ad_placement
+  created_at    DateTime  @default(now()) @db.DateTime(0)
+  campaign      AdCampaign @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "ad_impressions_ibfk_1")
+  ad            Ad        @relation(fields: [ad_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "ad_impressions_ibfk_2")
+  user          User?     @relation(fields: [user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "ad_impressions_ibfk_3")
+
+  @@index([campaign_id], map: "campaign_id")
+  @@index([ad_id], map: "ad_id")
+  @@index([user_id], map: "user_id")
+  @@index([created_at], map: "impression_date")
+  @@index([ip_address], map: "ip_address")
+  @@map("ad_impressions")
+}
+
+model AdClick {
+  id            Int       @id @default(autoincrement())
+  campaign_id   Int
+  ad_id         Int
+  user_id       Int?
+  ip_address    String    @db.VarChar(45)
+  user_agent    String?   @db.Text
+  placement     ad_placement
+  cost          Decimal   @db.Decimal(5, 2)
+  created_at    DateTime  @default(now()) @db.DateTime(0)
+  // Anti-fraud fields
+  session_id    String?   @db.VarChar(100)
+  is_suspicious Boolean   @default(false)
+  fraud_reason  String?   @db.Text
+  campaign      AdCampaign @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "ad_clicks_ibfk_1")
+  ad            Ad        @relation(fields: [ad_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "ad_clicks_ibfk_2")
+  user          User?     @relation(fields: [user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "ad_clicks_ibfk_3")
+
+  @@index([campaign_id], map: "campaign_id")
+  @@index([ad_id], map: "ad_id")
+  @@index([user_id], map: "user_id")
+  @@index([created_at], map: "click_date")
+  @@index([ip_address], map: "ip_address")
+  @@index([session_id], map: "session_id")
+  @@map("ad_clicks")
+}
+
+model AdminReport {
+  id          Int                       @id @default(autoincrement())
+  reported_by Int
+  target_type admin_reports_target_type
+  target_id   Int
+  reason      String                    @db.Text
+  status      admin_reports_status?     @default(open)
+  created_at  DateTime?                 @default(now()) @db.DateTime(0)
+  reporter    User                      @relation(fields: [reported_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "admin_reports_ibfk_1")
+
+  @@index([reported_by], map: "reported_by")
+  @@index([target_type, target_id], map: "target_type")
+  @@map("admin_reports")
+}
+
+model PlatformStats {
+   id           Int      @id @default(autoincrement())
+   date         DateTime @unique(map: "date") @db.Date
+   total_users  Int
+   total_orders Int
+   total_sales  Decimal  @db.Decimal(10, 2)
+   total_ads    Int
+
+   @@map("platform_stats")
+}
+
+model PlatformWallet {
+   id         Int      @id @default(autoincrement())
+   balance    Decimal  @db.Decimal(10, 2) @default(0)
+   updated_at DateTime @updatedAt @db.DateTime(0)
+
+   @@map("platform_wallet")
+}
+
+model Notification {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  message    String    @db.Text
+  is_read    Boolean?  @default(false)
+  created_at DateTime? @default(now()) @db.DateTime(0)
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "notifications_ibfk_1")
+
+  @@index([user_id, is_read], map: "user_id")
+  @@map("notifications")
+}
+
+enum roles_name {
+  buyer
+  seller
+  superadmin
+  delivery
+}
+
+enum admin_reports_target_type {
+  user
+  shop
+  product
+}
+
+enum orders_status {
+  pending
+  paid
+  shipped
+  delivered
+  cancelled
+}
+
+enum otps_type {
+  registration
+  login
+  recovery
+}
+
+enum admin_reports_status {
+  open
+  closed
+}
+
+enum orders_payment_method {
+  mobile_money
+  cash_on_delivery
+}
+
+enum ads_status {
+  pending
+  approved
+  rejected
+  active
+  paused
+  completed
+  expired
+}
+
+enum ad_campaigns_status {
+  draft
+  pending
+  active
+  paused
+  completed
+  expired
+  cancelled
+}
+
+enum ad_budget_type {
+  total
+  daily
+}
+
+enum ad_placement {
+  home
+  sidebar
+  product_page
+  search_results
+  category_page
+}
+
+enum ad_cost_model {
+  cpc    // Cost Per Click
+  cpm    // Cost Per Mille (1000 impressions)
+  cpa    // Cost Per Action
+}
+
+enum deliveries_status {
+  assigned
+  picked_up
+  in_transit
+  delivered
+  failed
+}
+
+model MtnPayment {
+  id             Int      @id @default(autoincrement())
+  reference_id   String   @unique @db.VarChar(100)
+  order_id       Int
+  phone_number   String   @db.VarChar(20)
+  amount         Decimal  @db.Decimal(10, 2)
+  currency       String   @db.VarChar(10) @default("EUR")
+  status         String   @db.VarChar(50) @default("pending")
+  transaction_id String?  @db.VarChar(100)
+  created_at     DateTime @default(now()) @db.DateTime(0)
+  updated_at     DateTime @updatedAt @db.DateTime(0)
+  order          Order    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([order_id], map: "order_id")
+  @@index([reference_id], map: "reference_id")
+  @@index([status], map: "status")
+  @@map("mtn_payments")
+}
+
+model AirtelPayment {
+  id                   Int      @id @default(autoincrement())
+  transaction_id       String   @unique @db.VarChar(100)
+  airtel_transaction_id String? @db.VarChar(100)
+  order_id             Int
+  phone_number         String   @db.VarChar(20)
+  amount               Decimal  @db.Decimal(10, 2)
+  currency             String   @db.VarChar(10) @default("UGX")
+  status               String   @db.VarChar(50) @default("pending")
+  created_at           DateTime @default(now()) @db.DateTime(0)
+  updated_at           DateTime @updatedAt @db.DateTime(0)
+  order                Order    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([order_id], map: "order_id")
+  @@index([transaction_id], map: "transaction_id")
+  @@index([status], map: "status")
+  @@map("airtel_payments")
+}
+
+model MtnDisbursement {
+  id             Int      @id @default(autoincrement())
+  reference_id   String   @unique @db.VarChar(100)
+  recipient_phone String  @db.VarChar(20)
+  amount         Decimal  @db.Decimal(10, 2)
+  currency       String   @db.VarChar(10) @default("EUR")
+  description    String?  @db.Text
+  status         String   @db.VarChar(50) @default("pending")
+  transaction_id String?  @db.VarChar(100)
+  transfer_type  String   @db.VarChar(50) @default("transfer") // transfer, refund, commission
+  created_at     DateTime @default(now()) @db.DateTime(0)
+  updated_at     DateTime @updatedAt @db.DateTime(0)
+
+  @@index([reference_id], map: "reference_id")
+  @@index([status], map: "status")
+  @@index([transfer_type], map: "transfer_type")
+  @@map("mtn_disbursements")
+}
+
+model Refund {
+  id                  Int      @id @default(autoincrement())
+  order_id            Int
+  amount              Decimal  @db.Decimal(10, 2)
+  reason              String   @db.Text
+  status              String   @db.VarChar(50) @default("pending")
+  disbursement_reference String? @db.VarChar(100)
+  created_at          DateTime @default(now()) @db.DateTime(0)
+  updated_at          DateTime @updatedAt @db.DateTime(0)
+  order               Order    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([order_id], map: "order_id")
+  @@index([status], map: "status")
+  @@map("refunds")
+}
+
+model Commission {
+  id                  Int      @id @default(autoincrement())
+  seller_id           Int
+  amount              Decimal  @db.Decimal(10, 2)
+  description         String   @db.Text
+  status              String   @db.VarChar(50) @default("pending")
+  disbursement_reference String? @db.VarChar(100)
+  created_at          DateTime @default(now()) @db.DateTime(0)
+  updated_at          DateTime @updatedAt @db.DateTime(0)
+  seller              User     @relation(fields: [seller_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([seller_id], map: "seller_id")
+  @@index([status], map: "status")
+  @@map("commissions")
+}
