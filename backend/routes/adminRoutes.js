@@ -32,7 +32,10 @@ const {
   getAvailableDeliveryPersonnel,
   createManualDelivery,
   createCompleteDelivery,
-  getDeliveryStats
+  getDeliveryStats,
+  getDeliveryPersonnelWithWorkload,
+  getOrdersPendingDelivery,
+  assignDeliveryToOrder
 } = require('../services/deliveryManagementService');
 
 const { authenticateToken, isSuperAdmin } = require('../middleware/auth');
@@ -1080,7 +1083,7 @@ router.put('/admin/deliveries/:id/assign', authenticateToken, isSuperAdmin, asyn
  */
 router.get('/admin/delivery-personnel', authenticateToken, isSuperAdmin, async (req, res) => {
   try {
-    const result = await getAvailableDeliveryPersonnel();
+    const result = await getDeliveryPersonnelWithWorkload();
 
     if (result.success) {
       res.json(result);
@@ -1144,6 +1147,39 @@ router.post('/admin/deliveries/create', authenticateToken, isSuperAdmin, async (
   } catch (error) {
     console.error('Error creating delivery:', error);
     res.status(500).json({ message: 'Erreur lors de la création de la livraison' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/admin/delivery-personnel:
+ *   get:
+ *     summary: Get all delivery personnel with their current workload (SuperAdmin only)
+ *     tags: [Admin Delivery Personnel]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Delivery personnel retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Access denied
+ *       500:
+ *         description: Server error
+ */
+router.get('/admin/delivery-personnel', authenticateToken, isSuperAdmin, async (req, res) => {
+  try {
+    const result = await getDeliveryPersonnelWithWorkload();
+
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(500).json({ message: result.error });
+    }
+  } catch (error) {
+    console.error('Error getting delivery personnel:', error);
+    res.status(500).json({ message: 'Erreur lors de la récupération du personnel de livraison' });
   }
 });
 

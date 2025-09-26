@@ -501,6 +501,72 @@ const getDeliveriesForPerson = async (deliveryPersonId, status = null) => {
   }
 };
 
+// Obtenir tous les livreurs avec leur charge de travail actuelle
+const getDeliveryPersonnelWithWorkload = async () => {
+  try {
+    // Récupérer tous les utilisateurs avec le rôle delivery (role_id = 4)
+    const deliveryPersonnel = await prisma.user.findMany({
+      where: {
+        role_id: 4 // delivery role
+      },
+      select: {
+        id: true,
+        full_name: true,
+        email: true,
+        phone_number: true,
+        created_at: true,
+        deliveries: {
+          where: {
+            status: {
+              in: ['assigned', 'picked_up', 'in_transit'] // Livraisons actives
+            }
+          },
+          select: {
+            id: true,
+            status: true
+          }
+        }
+      },
+      orderBy: {
+        full_name: 'asc'
+      }
+    });
+
+    // Calculer la disponibilité pour chaque livreur
+    const personnelWithAvailability = deliveryPersonnel.map(person => {
+      const activeDeliveries = person.deliveries.length;
+      let availability = 'available';
+
+      if (activeDeliveries >= 5) {
+        availability = 'overloaded';
+      } else if (activeDeliveries >= 3) {
+        availability = 'busy';
+      }
+
+      return {
+        id: person.id.toString(),
+        full_name: person.full_name,
+        email: person.email,
+        phone_number: person.phone_number,
+        active_deliveries: activeDeliveries,
+        availability: availability
+      };
+    });
+
+    return {
+      success: true,
+      personnel: personnelWithAvailability
+    };
+
+  } catch (error) {
+    console.error('Erreur lors de la récupération du personnel de livraison:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
 // Admin functions for delivery management
 const assignDeliveryToPerson = async (deliveryId, deliveryPersonId, adminId) => {
   try {
@@ -1119,5 +1185,6 @@ module.exports = {
   createCompleteDelivery,
   getOrdersPendingDelivery,
   assignDeliveryToOrder,
+  getDeliveryPersonnelWithWorkload,
   getDeliveryStats
 };
