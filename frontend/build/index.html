@@ -1,0 +1,30 @@
+
+  <!DOCTYPE html>
+  <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>SOMBANGO</title>
+      <link rel="icon" type="image/x-icon" href="/assets/favicon-CfQk0i9K.ico" />
+      <!-- Stripe development mode configuration to suppress HTTP warning -->
+      <script>
+        // Suppress Stripe HTTP warning in development
+        if (typeof window !== 'undefined') {
+          // Set Stripe to development mode to suppress HTTP warnings
+          window.__STRIPE_SUPPRESS_HTTP_WARNING__ = true;
+          // Alternative approach
+          Object.defineProperty(window, '__stripe_internal__', {
+            value: { suppressHTTPWarning: true },
+            writable: false
+          });
+        }
+      </script>
+      <script type="module" crossorigin src="/assets/index-DLjAqFiI.js"></script>
+      <link rel="stylesheet" crossorigin href="/assets/index-csIVUhHF.css">
+    </head>
+
+    <body>
+      <div id="root"></div>
+    </body>
+  </html>
+  

@@ -6,6 +6,7 @@ import { Badge } from "./ui/badge";
 import { useAuth } from "./AuthContext";
 import { toast } from "sonner";
 import useWebSocket from "../hooks/useWebSocket";
+import { CreateDeliveryModal } from "./CreateDeliveryModal";
 import {
   Users,
   ShoppingBag,
@@ -195,6 +196,9 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     adminDeliveryReady,
     adminDeliveryCompleted
   } = useWebSocket(user?.id?.toString(), 'superadmin');
+
+  // Modal state
+  const [isCreateDeliveryModalOpen, setIsCreateDeliveryModalOpen] = useState(false);
 
   // ===== ALGORITHME Admin_Dashboard_Complet - ÉTATS =====
   const [platformStats, setPlatformStats] = useState<PlatformStats>({
@@ -3180,7 +3184,10 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   <p className="text-gray-600 mt-1">Assigner et gérer les missions de livraison</p>
                 </div>
                 <div className="flex items-center space-x-4">
-                  <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <Button
+                    onClick={() => setIsCreateDeliveryModalOpen(true)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Créer Livraison
                   </Button>
@@ -3420,6 +3427,16 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Create Delivery Modal */}
+      <CreateDeliveryModal
+        isOpen={isCreateDeliveryModalOpen}
+        onClose={() => setIsCreateDeliveryModalOpen(false)}
+        onDeliveryCreated={() => {
+          loadDeliveries();
+          loadDeliveryStats();
+        }}
+      />
     </div>
   );
 }

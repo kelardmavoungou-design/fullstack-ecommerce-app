@@ -797,6 +797,123 @@ const getDeliveryStats = async () => {
   }
 };
 
+// Créer une livraison complète depuis zéro (commande + livraison)
+const createCompleteDelivery = async (deliveryData, adminId) => {
+  const {
+    buyer_id,
+    shop_id,
+    items,
+    shipping_address,
+    delivery_latitude,
+    delivery_longitude,
+    delivery_person_id,
+    notes
+  } = deliveryData;
+
+  try {
+    // Calculer le total de la commande
+    let total = 0;
+    for (const item of items) {
+      const product = await prisma.product.findUnique({
+        where: { id: item.product_id }
+      });
+      if (!product) throw new Error(`Produit ${item.product_id} non trouvé`);
+      total += parseFloat(product.price) * item.quantity;
+    }
+
+    // Créer la commande
+    const order = await prisma.order.create({
+      data: {
+        buyer_id,
+        shop_id,
+        total,
+        payment_method: 'mobile_money',
+        shipping_address,
+        delivery_latitude,
+        delivery_longitude,
+        status: 'paid', // On suppose que le paiement est déjà effectué
+        notes: notes || null
+      }
+    });
+
+    // Créer les items de commande
+    for (const item of items) {
+      const product = await prisma.product.findUnique({
+        where: { id: item.product_id }
+      });
+
+      await prisma.orderItem.create({
+        data: {
+          order_id: order.id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          price: product.price
+        }
+      });
+    }
+
+    // Créer la livraison avec le livreur spécifié
+    const validationCode = generateValidationCode();
+    const delivery = await prisma.delivery.create({
+      data: {
+        order_id: order.id,
+        delivery_person_id: delivery_person_id,
+        status: 'assigned',
+        total_products: items.length,
+        collected_products: 0,
+        progress: 0,
+        validation_code: validationCode,
+        assigned_at: new Date(),
+        notes: notes || null
+      },
+      include: {
+        order: {
+          include: {
+            buyer: true,
+            shop: true,
+            items: { include: { product: true } }
+          }
+        },
+        delivery_person: true
+      }
+    });
+
+    // Créer les entrées de collecte pour chaque produit
+    for (const item of items) {
+      const product = await prisma.product.findUnique({
+        where: { id: item.product_id },
+        include: { shop: true }
+      });
+
+      await prisma.deliveryProductCollection.create({
+        data: {
+          delivery_id: delivery.id,
+          product_id: item.product_id,
+          shop_id: product.shop_id,
+          status: 'pending'
+        }
+      });
+    }
+
+    console.log(`Livraison complète créée #${delivery.id} pour commande #${order.id} par admin ${adminId}`);
+
+    return {
+      success: true,
+      order,
+      delivery,
+      validationCode,
+      message: 'Livraison créée avec succès'
+    };
+
+  } catch (error) {
+    console.error('Erreur lors de la création de livraison complète:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
 module.exports = {
   createOrderWithDelivery,
   collectProduct,
@@ -811,5 +928,6 @@ module.exports = {
   getAllDeliveries,
   getAvailableDeliveryPersonnel,
   createManualDelivery,
+  createCompleteDelivery,
   getDeliveryStats
 };
